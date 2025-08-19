@@ -1,5 +1,8 @@
 # Orpheus TTS Enterprise Web UI
 
+  cd /home/lightning/Documents/Stream/vllm-orpheus-setup/orpheus-ui
+  ./launch.sh
+
 A modern, enterprise-grade web interface for Orpheus TTS with real-time streaming capabilities.
 
 ## Features

@@ -17,6 +17,8 @@ import io
 import base64
 import time
 import numpy as np
+import zipfile
+import tempfile
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -214,10 +216,10 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
             if chunk:
                 chunks.append(chunk)
                 chunk_count += 1
-        # Estimate tokens based on audio generation
-        # Orpheus generates ~150 tokens per second of audio
-        # Each chunk is roughly 10-20 tokens
-        token_count = chunk_count * 15  # Rough estimate
+        # More accurate token estimation based on vLLM actual performance
+        # vLLM reports ~150 tokens/s for RTX 5090, not 300+
+        # Each audio chunk represents approximately 7-10 tokens
+        token_count = chunk_count * 8  # Reduced from 15 to match actual throughput
         
         # Try to get actual token stats from model if available
         try:
@@ -273,8 +275,9 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     
     # Better token estimation based on audio duration if no actual count
     if token_count == 0 and audio_seconds > 0:
-        # Orpheus typically generates ~150-200 tokens per second of audio
-        token_count = int(audio_seconds * 175)
+        # Orpheus on RTX 5090 generates ~140-160 tokens per second of audio
+        # Based on vLLM metrics: "Avg generation throughput: 147.9 tokens/s"
+        token_count = int(audio_seconds * 150)  # Use 150 as average
     
     tokens_per_sec = (token_count / (elapsed_ms / 1000.0)) if elapsed_ms > 0 and token_count > 0 else 0.0
     
@@ -408,6 +411,78 @@ async def delete_session(session_id: str):
     del audio_sessions[session_id]
     
     return {"message": "Session deleted successfully"}
+
+@app.get("/api/download/{session_id}")
+async def download_session(session_id: str):
+    """Download a specific session's audio file"""
+    if session_id not in audio_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session_data = audio_sessions[session_id]
+    
+    if "audio_file" not in session_data:
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    audio_path = Path("static/audio") / session_data["audio_file"]
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+    
+    # Create filename with voice and timestamp
+    voice = session_data.get("voice", "unknown")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"orpheus_{voice}_{timestamp}.wav"
+    
+    return FileResponse(
+        audio_path,
+        media_type="audio/wav",
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.get("/api/download-all")
+async def download_all_sessions():
+    """Download all sessions as a zip file"""
+    if not audio_sessions:
+        raise HTTPException(status_code=404, detail="No sessions available")
+    
+    # Create a temporary zip file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+        with zipfile.ZipFile(tmp_file, 'w') as zip_file:
+            for session_id, session_data in audio_sessions.items():
+                if "audio_file" in session_data and session_data.get("status") == "completed":
+                    audio_path = Path("static/audio") / session_data["audio_file"]
+                    if audio_path.exists():
+                        # Create descriptive filename
+                        voice = session_data.get("voice", "unknown")
+                        text_preview = session_data.get("text", "")[:30].replace(" ", "_").replace("/", "_")
+                        filename = f"{voice}_{text_preview}_{session_id[:8]}.wav"
+                        
+                        # Add to zip
+                        zip_file.write(audio_path, filename)
+                        
+                        # Also add a text file with the full text
+                        text_content = f"Voice: {voice}\n"
+                        text_content += f"Session: {session_id}\n"
+                        text_content += f"Timestamp: {session_data.get('timestamp', '')}\n"
+                        text_content += f"Duration: {session_data.get('duration', 0):.2f}s\n"
+                        text_content += f"Tokens: {session_data.get('tokens', 0)}\n"
+                        text_content += f"TPS: {session_data.get('tps', 0):.2f}\n\n"
+                        text_content += f"Text:\n{session_data.get('text', '')}"
+                        
+                        text_filename = f"{voice}_{text_preview}_{session_id[:8]}.txt"
+                        zip_file.writestr(text_filename, text_content)
+        
+        tmp_path = tmp_file.name
+    
+    # Return the zip file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return FileResponse(
+        tmp_path,
+        media_type="application/zip",
+        filename=f"orpheus_sessions_{timestamp}.zip",
+        headers={"Content-Disposition": f"attachment; filename=orpheus_sessions_{timestamp}.zip"},
+        background=lambda: os.unlink(tmp_path)  # Delete temp file after sending
+    )
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

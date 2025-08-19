@@ -38,11 +38,14 @@
         <div class="main-container">
             <!-- Sidebar -->
             <aside class="sidebar">
-                <div class="sidebar-section">
+                <div class="sidebar-section sessions-section">
                     <h3><i class="fas fa-history"></i> Recent Sessions</h3>
-                    <div style="margin-bottom: 0.5rem;">
-                        <button id="clear-all-sessions-btn" class="btn btn-danger" style="width: 100%; font-size: 0.875rem;">
-                            <i class="fas fa-trash-alt"></i> Clear All Sessions
+                    <div class="session-controls">
+                        <button id="download-all-sessions-btn" class="btn btn-success session-control-btn">
+                            <i class="fas fa-download"></i> Download All
+                        </button>
+                        <button id="clear-all-sessions-btn" class="btn btn-danger session-control-btn">
+                            <i class="fas fa-trash-alt"></i> Clear All
                         </button>
                     </div>
                     <div id="session-list" class="session-list">

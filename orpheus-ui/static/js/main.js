@@ -4,6 +4,8 @@
 let currentSessionId = null;
 let selectedVoice = 'tara';  // Changed default to tara
 let audioContext = null;
+let currentlyPlayingAudio = null;
+let currentlyPlayingSessionId = null;
 
 // Sample texts with emotion tags
 const sampleTexts = {
@@ -69,6 +71,7 @@ function setupEventListeners() {
     // Settings buttons
     document.getElementById('reset-settings-btn').addEventListener('click', resetSettings);
     document.getElementById('clear-all-sessions-btn').addEventListener('click', clearAllSessions);
+    document.getElementById('download-all-sessions-btn').addEventListener('click', downloadAllSessions);
     document.getElementById('set-unlimited-btn').addEventListener('click', setUnlimitedTokens);
 }
 
@@ -248,10 +251,18 @@ function createSessionElement(session) {
     div.className = 'session-item';
     div.onclick = () => loadSession(session.session_id);
     
+    const isPlaying = currentlyPlayingSessionId === session.session_id;
+    const playIcon = isPlaying ? 'fa-pause' : 'fa-play';
+    const playTitle = isPlaying ? 'Pause' : 'Play';
+    
     div.innerHTML = `
         <div class="session-item-header">
             <span class="session-voice">${session.voice}</span>
-            <i class="fas fa-trash-alt" onclick="event.stopPropagation(); deleteSession('${session.session_id}')"></i>
+            <div class="session-actions">
+                <i class="fas ${playIcon} session-action-btn play-btn-${session.session_id}" title="${playTitle}" onclick="event.stopPropagation(); togglePlaySession('${session.session_id}')"></i>
+                <i class="fas fa-download session-action-btn" title="Download" onclick="event.stopPropagation(); downloadSession('${session.session_id}')"></i>
+                <i class="fas fa-trash-alt session-action-btn" title="Delete" onclick="event.stopPropagation(); deleteSession('${session.session_id}')"></i>
+            </div>
         </div>
         <div class="session-text">${session.text}</div>
         <div class="session-time">${new Date(session.timestamp).toLocaleString()}</div>
@@ -396,6 +407,132 @@ async function clearAllSessions() {
     } catch (error) {
         console.error('Error clearing sessions:', error);
         showToast('Failed to clear sessions', 'error');
+    }
+}
+
+async function downloadAllSessions() {
+    try {
+        // Check if there are any sessions
+        const response = await fetch('/api/sessions');
+        const data = await response.json();
+        
+        if (!data.sessions || data.sessions.length === 0) {
+            showToast('No sessions to download', 'warning');
+            return;
+        }
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.href = '/api/download-all';
+        link.download = `orpheus_sessions_${Date.now()}.zip`;
+        link.click();
+        
+        showToast('Downloading all sessions as ZIP...', 'success');
+    } catch (error) {
+        console.error('Error downloading sessions:', error);
+        showToast('Failed to download sessions', 'error');
+    }
+}
+
+async function togglePlaySession(sessionId) {
+    try {
+        // If this session is currently playing, pause it
+        if (currentlyPlayingSessionId === sessionId && currentlyPlayingAudio) {
+            if (!currentlyPlayingAudio.paused) {
+                currentlyPlayingAudio.pause();
+                updatePlayButton(sessionId, false);
+                showToast('Paused', 'info');
+                return;
+            } else {
+                // Resume playback
+                currentlyPlayingAudio.play();
+                updatePlayButton(sessionId, true);
+                showToast('Resumed', 'info');
+                return;
+            }
+        }
+        
+        // Stop any currently playing audio
+        if (currentlyPlayingAudio) {
+            currentlyPlayingAudio.pause();
+            currentlyPlayingAudio = null;
+            if (currentlyPlayingSessionId) {
+                updatePlayButton(currentlyPlayingSessionId, false);
+            }
+        }
+        
+        // Fetch and play the new session
+        const response = await fetch(`/api/session/${sessionId}`);
+        const session = await response.json();
+        
+        if (session.audio_url) {
+            // Create audio element and play it
+            const audio = new Audio(session.audio_url);
+            currentlyPlayingAudio = audio;
+            currentlyPlayingSessionId = sessionId;
+            
+            // Update button to pause icon
+            updatePlayButton(sessionId, true);
+            
+            // Handle audio events
+            audio.onended = () => {
+                updatePlayButton(sessionId, false);
+                currentlyPlayingAudio = null;
+                currentlyPlayingSessionId = null;
+                showToast('Playback finished', 'info');
+            };
+            
+            audio.onerror = () => {
+                updatePlayButton(sessionId, false);
+                currentlyPlayingAudio = null;
+                currentlyPlayingSessionId = null;
+                showToast('Audio playback error', 'error');
+            };
+            
+            // Play the audio
+            await audio.play();
+            showToast(`Playing ${session.voice}: "${session.text.substring(0, 30)}..."`, 'info');
+        } else {
+            showToast('Audio not available', 'warning');
+        }
+    } catch (error) {
+        console.error('Error playing session:', error);
+        showToast('Failed to play session', 'error');
+        if (currentlyPlayingSessionId === sessionId) {
+            updatePlayButton(sessionId, false);
+            currentlyPlayingAudio = null;
+            currentlyPlayingSessionId = null;
+        }
+    }
+}
+
+function updatePlayButton(sessionId, isPlaying) {
+    const button = document.querySelector(`.play-btn-${sessionId}`);
+    if (button) {
+        if (isPlaying) {
+            button.classList.remove('fa-play');
+            button.classList.add('fa-pause');
+            button.title = 'Pause';
+        } else {
+            button.classList.remove('fa-pause');
+            button.classList.add('fa-play');
+            button.title = 'Play';
+        }
+    }
+}
+
+async function downloadSession(sessionId) {
+    try {
+        // Create download link
+        const link = document.createElement('a');
+        link.href = `/api/download/${sessionId}`;
+        link.download = `orpheus_audio_${sessionId}.wav`;
+        link.click();
+        
+        showToast('Downloading audio...', 'success');
+    } catch (error) {
+        console.error('Error downloading session:', error);
+        showToast('Failed to download session', 'error');
     }
 }
 
