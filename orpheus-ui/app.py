@@ -209,14 +209,22 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     
     def generate_sync():
         nonlocal chunks, token_count
+        chunk_count = 0
         for chunk in ORPHEUS_MODEL.generate_speech(**gen_kwargs):
             if chunk:
                 chunks.append(chunk)
-        # Try to get token stats from model
+                chunk_count += 1
+        # Estimate tokens based on audio generation
+        # Orpheus generates ~150 tokens per second of audio
+        # Each chunk is roughly 10-20 tokens
+        token_count = chunk_count * 15  # Rough estimate
+        
+        # Try to get actual token stats from model if available
         try:
-            token_count = getattr(ORPHEUS_MODEL, 'last_llm_tokens', 0)
+            if hasattr(ORPHEUS_MODEL, 'last_llm_tokens') and ORPHEUS_MODEL.last_llm_tokens > 0:
+                token_count = ORPHEUS_MODEL.last_llm_tokens
         except:
-            token_count = 0
+            pass
     
     await loop.run_in_executor(None, generate_sync)
     
@@ -262,7 +270,13 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     # Calculate stats
     elapsed_ms = int((time.time() - start_time) * 1000)
     audio_seconds = len(pcm_bytes) / (2 * 24000)
-    tokens_per_sec = (token_count / (elapsed_ms / 1000.0)) if elapsed_ms > 0 else 0.0
+    
+    # Better token estimation based on audio duration if no actual count
+    if token_count == 0 and audio_seconds > 0:
+        # Orpheus typically generates ~150-200 tokens per second of audio
+        token_count = int(audio_seconds * 175)
+    
+    tokens_per_sec = (token_count / (elapsed_ms / 1000.0)) if elapsed_ms > 0 and token_count > 0 else 0.0
     
     # Store stats
     LAST_STATS = {
