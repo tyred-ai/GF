@@ -103,6 +103,89 @@ python test_vllm.py
 python test_orpheus.py
 ```
 
+## 🎮 Server Management
+
+### Starting the Web UI Server
+
+```bash
+# Navigate to the UI directory
+cd /home/lightning/Documents/Stream/vllm-orpheus-setup/orpheus-ui
+
+# Start the server
+./launch.sh
+
+# Or start with custom settings
+VLLM_GPU_MEM_UTIL=0.8 ./launch.sh
+```
+
+### Stopping the Server
+
+```bash
+# While the server is running, press:
+Ctrl + C
+
+# If the server is stuck or frozen:
+Ctrl + Z  # Suspend the process
+kill %1   # Kill the suspended job
+
+# If you closed the terminal, find and kill the process:
+ps aux | grep "python app.py"  # Find the process ID
+kill <PID>  # Replace <PID> with the actual process ID
+
+# Force kill if needed:
+kill -9 <PID>
+```
+
+### Running in Background
+
+```bash
+# Start server in background
+nohup ./launch.sh > server.log 2>&1 &
+
+# Check if it's running
+ps aux | grep "python app.py"
+
+# Monitor the logs
+tail -f server.log
+
+# Stop background server
+pkill -f "python app.py"
+```
+
+### Quick Server Commands
+
+```bash
+# Check if server is running
+curl http://localhost:8000/api/health
+
+# Test generation from command line
+curl -X POST http://localhost:8000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello world","voice":"leo"}'
+
+# View server logs (if running with nohup)
+tail -f orpheus-ui/server.log
+```
+
+### Troubleshooting Server Issues
+
+```bash
+# Check GPU memory usage
+nvidia-smi
+
+# Kill all Python processes using GPU (careful!)
+nvidia-smi | grep python | awk '{print $5}' | xargs -r kill -9
+
+# Clear GPU memory cache
+python -c "import torch; torch.cuda.empty_cache()"
+
+# Check which process is using port 8000
+lsof -i :8000
+
+# Force kill process on port 8000
+lsof -t -i:8000 | xargs -r kill -9
+```
+
 ## 💻 Usage
 
 ### Simple Command-Line Usage

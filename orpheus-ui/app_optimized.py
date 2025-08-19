@@ -90,31 +90,41 @@ def init_global_model():
         return ORPHEUS_MODEL
     
     from orpheus_tts import OrpheusModel
-    import torch
     
     # Model configuration
     model_id = os.getenv("ORPHEUS_MODEL_ID", "canopylabs/orpheus-3b-0.1-ft")
+    tokenizer_id = os.getenv("ORPHEUS_TOKENIZER_ID", "canopylabs/orpheus-3b-0.1-pretrained")
     
-    # Set vLLM environment variables for optimization
-    # These must be set before model initialization
-    os.environ["VLLM_GPU_MEM_UTIL"] = os.getenv("VLLM_GPU_MEM_UTIL", "0.85")
-    os.environ["VLLM_MAX_NUM_SEQS"] = os.getenv("VLLM_MAX_NUM_SEQS", "1")
-    os.environ["VLLM_ENFORCE_EAGER"] = os.getenv("VLLM_ENFORCE_EAGER", "0")
-    os.environ["VLLM_ENABLE_CHUNKED_PREFILL"] = os.getenv("VLLM_ENABLE_CHUNKED_PREFILL", "1")
-    os.environ["VLLM_ENABLE_PREFIX_CACHING"] = os.getenv("VLLM_ENABLE_PREFIX_CACHING", "0")
-    os.environ["VLLM_KV_CACHE_DTYPE"] = os.getenv("VLLM_KV_CACHE_DTYPE", "auto")
-    os.environ["VLLM_MAX_MODEL_LEN"] = os.getenv("VLLM_MAX_MODEL_LEN", "8192")
+    # vLLM engine tuning for RTX 5090 (32GB VRAM)
+    # These settings prevent OOM and optimize performance
+    gpu_mem_util = float(os.getenv("VLLM_GPU_MEM_UTIL", "0.85"))  # Leave some room for SNAC decoder
+    max_num_seqs = int(os.getenv("VLLM_MAX_NUM_SEQS", "1"))  # Single sequence for TTS
+    enforce_eager = os.getenv("VLLM_ENFORCE_EAGER", "0") == "1"  # Use CUDA graphs for speed
+    enable_chunked_prefill = os.getenv("VLLM_ENABLE_CHUNKED_PREFILL", "1") == "1"
+    enable_prefix_caching = os.getenv("VLLM_ENABLE_PREFIX_CACHING", "0") == "1"
+    kv_cache_dtype = os.getenv("VLLM_KV_CACHE_DTYPE", "auto")  # Can use "fp8" to save memory
+    max_model_len = int(os.getenv("VLLM_MAX_MODEL_LEN", "8192"))  # Limit context for TTS
+    
+    engine_kwargs = {
+        "gpu_memory_utilization": gpu_mem_util,
+        "max_num_seqs": max_num_seqs,
+        "enforce_eager": enforce_eager,
+        "enable_chunked_prefill": enable_chunked_prefill,
+        "enable_prefix_caching": enable_prefix_caching,
+        "kv_cache_dtype": kv_cache_dtype,
+        "max_model_len": max_model_len,
+        "dtype": "auto",  # Will use bfloat16 on RTX 5090
+    }
     
     print(f"Initializing Orpheus model with optimized settings:")
-    print(f"  Model: {model_id}")
-    print(f"  GPU Memory Utilization: {os.environ['VLLM_GPU_MEM_UTIL']}")
-    print(f"  Max Model Length: {os.environ['VLLM_MAX_MODEL_LEN']}")
-    print(f"  KV Cache Type: {os.environ['VLLM_KV_CACHE_DTYPE']}")
+    print(f"  GPU Memory Utilization: {gpu_mem_util}")
+    print(f"  Max Model Length: {max_model_len}")
+    print(f"  KV Cache Type: {kv_cache_dtype}")
     
-    # OrpheusModel only accepts model_name and dtype
     ORPHEUS_MODEL = OrpheusModel(
         model_name=model_id,
-        dtype=torch.bfloat16  # Optimal for RTX 5090
+        tokenizer=tokenizer_id,
+        **engine_kwargs
     )
     
     print("✅ Model loaded successfully")

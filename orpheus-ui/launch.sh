@@ -102,5 +102,14 @@ echo "Press Ctrl+C to stop the server"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
+# Check if generate_cli.py exists
+if [ ! -f "generate_cli.py" ]; then
+    echo "❌ Error: generate_cli.py not found!"
+    echo "   This file is required for audio generation."
+    exit 1
+fi
+
+echo "✅ Using subprocess isolation for GPU memory management"
+
 # Launch the server
 exec python app.py
