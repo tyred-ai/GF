@@ -294,14 +294,15 @@ body {
 
 #text-input {
     width: 100%;
-    min-height: 300px;
+    min-height: 500px;
+    max-height: 800px;
     padding: 1.5rem;
     background: var(--bg-card);
     border: 2px solid var(--primary-color);
     border-radius: 0.5rem;
     color: var(--text-primary);
     font-size: 1.1rem;
-    line-height: 1.6;
+    line-height: 1.8;
     resize: vertical;
     font-family: 'Space Mono', monospace;
     box-shadow: 0 0 30px rgba(0, 255, 204, 0.2),
