@@ -1,0 +1,27 @@
+# Orpheus TTS UI Requirements
+# Python 3.11.9 required
+
+# Core web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Template engine
+jinja2==3.1.4
+
+# WebSocket support
+websockets==14.1
+python-multipart==0.0.18
+
+# Audio processing
+numpy==1.26.4
+wave
+
+# Orpheus TTS (already installed in parent environment)
+# orpheus-speech
+
+# Utilities
+python-dotenv==1.0.1
+aiofiles==24.1.0
+
+# Optional performance improvements
+orjson==3.10.12

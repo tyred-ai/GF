@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orpheus TTS Enterprise - Text to Speech Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-microphone-alt logo-icon"></i>
+                    <h1>Orpheus TTS Enterprise</h1>
+                    <span class="version-badge">v1.0</span>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-server"></i>
+                        <span id="model-status" class="status-indicator">Loading...</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>RTX 5090</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-history"></i> Recent Sessions</h3>
+                    <div id="session-list" class="session-list">
+                        <!-- Sessions will be loaded here -->
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-cog"></i> Settings</h3>
+                    <div class="settings-group">
+                        <label for="temperature">Temperature</label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.6">
+                        <span id="temp-value">0.6</span>
+                    </div>
+                    <div class="settings-group">
+                        <label for="top-p">Top-P</label>
+                        <input type="range" id="top-p" min="0" max="1" step="0.1" value="0.8">
+                        <span id="top-p-value">0.8</span>
+                    </div>
+                    <div class="settings-group">
+                        <label for="max-tokens">Max Tokens</label>
+                        <input type="number" id="max-tokens" min="100" max="2000" value="1200">
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Work Area -->
+            <main class="main-content">
+                <!-- Input Section -->
+                <div class="input-section card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-keyboard"></i> Text Input</h2>
+                        <div class="input-controls">
+                            <button id="clear-btn" class="btn btn-secondary">
+                                <i class="fas fa-eraser"></i> Clear
+                            </button>
+                            <button id="load-sample-btn" class="btn btn-secondary">
+                                <i class="fas fa-file-alt"></i> Load Sample
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <textarea id="text-input" placeholder="Enter your text here... You can use emotion tags like <laugh> or <sigh> for more expressive speech." rows="8"></textarea>
+                        <div class="text-stats">
+                            <span>Characters: <strong id="char-count">0</strong></span>
+                            <span>Words: <strong id="word-count">0</strong></span>
+                            <span>Est. Duration: <strong id="est-duration">0s</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Voice Selection -->
+                <div class="voice-section card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-users"></i> Voice Selection</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="voice-grid">
+                            <div class="voice-card active" data-voice="leo">
+                                <i class="fas fa-user-tie"></i>
+                                <span>Leo</span>
+                                <small>Professional</small>
+                            </div>
+                            <div class="voice-card" data-voice="tara">
+                                <i class="fas fa-user"></i>
+                                <span>Tara</span>
+                                <small>Conversational</small>
+                            </div>
+                            <div class="voice-card" data-voice="zoe">
+                                <i class="fas fa-user"></i>
+                                <span>Zoe</span>
+                                <small>Friendly</small>
+                            </div>
+                            <div class="voice-card" data-voice="zac">
+                                <i class="fas fa-user-tie"></i>
+                                <span>Zac</span>
+                                <small>Authoritative</small>
+                            </div>
+                            <div class="voice-card" data-voice="jess">
+                                <i class="fas fa-user"></i>
+                                <span>Jess</span>
+                                <small>Energetic</small>
+                            </div>
+                            <div class="voice-card" data-voice="mia">
+                                <i class="fas fa-user"></i>
+                                <span>Mia</span>
+                                <small>Warm</small>
+                            </div>
+                            <div class="voice-card" data-voice="julia">
+                                <i class="fas fa-user"></i>
+                                <span>Julia</span>
+                                <small>Clear</small>
+                            </div>
+                            <div class="voice-card" data-voice="leah">
+                                <i class="fas fa-user"></i>
+                                <span>Leah</span>
+                                <small>Smooth</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="action-section">
+                    <button id="generate-btn" class="btn btn-primary btn-large">
+                        <i class="fas fa-play-circle"></i> Generate Speech
+                    </button>
+                    <button id="stream-btn" class="btn btn-secondary btn-large">
+                        <i class="fas fa-stream"></i> Stream Real-time
+                    </button>
+                </div>
+
+                <!-- Output Section -->
+                <div class="output-section card" id="output-section" style="display: none;">
+                    <div class="card-header">
+                        <h2><i class="fas fa-volume-up"></i> Generated Audio</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="audio-player">
+                            <audio id="audio-player" controls></audio>
+                            <div class="audio-info">
+                                <div class="info-item">
+                                    <i class="fas fa-clock"></i>
+                                    <span>Duration: <strong id="audio-duration">0s</strong></span>
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-file"></i>
+                                    <span>Size: <strong id="audio-size">0 KB</strong></span>
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-user"></i>
+                                    <span>Voice: <strong id="audio-voice">-</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-section">
+                            <button id="download-btn" class="btn btn-success">
+                                <i class="fas fa-download"></i> Download WAV
+                            </button>
+                            <button id="share-btn" class="btn btn-secondary">
+                                <i class="fas fa-share-alt"></i> Share
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Indicator -->
+                <div class="progress-overlay" id="progress-overlay" style="display: none;">
+                    <div class="progress-card">
+                        <div class="spinner"></div>
+                        <h3>Generating Speech...</h3>
+                        <p id="progress-message">Processing your text with Orpheus TTS</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <span>Powered by Orpheus TTS + vLLM | RTX 5090 32GB</span>
+                <span>© 2024 Enterprise Edition</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Sample Texts Modal -->
+    <div class="modal" id="sample-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Sample Texts</h3>
+                <button class="modal-close" onclick="closeSampleModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="sample-item" onclick="loadSample('professional')">
+                    <h4>Professional Announcement</h4>
+                    <p>Good morning, everyone. Today, we're excited to announce the launch of our new enterprise text-to-speech platform. This cutting-edge technology delivers natural, human-like voice synthesis with unprecedented quality.</p>
+                </div>
+                <div class="sample-item" onclick="loadSample('conversational')">
+                    <h4>Conversational</h4>
+                    <p>Hey there! <laugh> I just wanted to tell you about this amazing new feature we've been working on. It's pretty incredible how natural this sounds, right? <sigh> Technology these days is just mind-blowing!</p>
+                </div>
+                <div class="sample-item" onclick="loadSample('narrative')">
+                    <h4>Narrative</h4>
+                    <p>Once upon a time, in a world where machines could speak with the warmth and nuance of human voices, there lived a powerful AI named Orpheus. Its voice could convey emotions, tell stories, and connect with people in ways never before imagined.</p>
+                </div>
+                <div class="sample-item" onclick="loadSample('technical')">
+                    <h4>Technical Documentation</h4>
+                    <p>The Orpheus TTS system utilizes a three billion parameter language model, fine-tuned specifically for speech synthesis. Operating at 24 kilohertz with 16-bit audio depth, it achieves real-time factor greater than 1.0x on modern GPUs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
