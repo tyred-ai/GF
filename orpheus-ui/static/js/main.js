@@ -8,11 +8,11 @@ let audioContext = null;
 // Sample texts with emotion tags
 const sampleTexts = {
     professional: "Good morning, everyone. Today, we're excited to announce the launch of our new enterprise text-to-speech platform. This cutting-edge technology delivers natural, human-like voice synthesis with unprecedented quality.",
-    conversational: "Hey there! <laugh> I just wanted to tell you about this amazing new feature we've been working on. It's pretty incredible how natural this sounds, right? <sigh> Technology these days is just mind-blowing!",
-    narrative: "Once upon a time, in a world where machines could speak with the warmth and nuance of human voices, there lived a powerful AI named Orpheus. <gasp> Its voice could convey emotions, tell stories, and connect with people in ways never before imagined.",
-    technical: "The Orpheus TTS system utilizes a three billion parameter language model, fine-tuned specifically for speech synthesis. <cough> Operating at 24 kilohertz with 16-bit audio depth, it achieves real-time factor greater than 1.0x on modern GPUs.",
-    emotional: "I can't believe it's finally happening! <laugh> After all this time, we did it! <sniffle> I'm just so happy right now. <sigh> Thank you all for believing in this project.",
-    expressive: "Hmm, let me think about that for a moment. <yawn> Oh, excuse me, it's been a long day. <chuckle> But seriously, this is an interesting question. <groan> Though I must admit, it's more complex than I initially thought."
+    conversational: "Hey there! I just wanted to tell you about this amazing new feature we've been working on. It's pretty incredible how natural this sounds, right? Technology these days is just mind-blowing!",
+    narrative: "Once upon a time, in a world where machines could speak with the warmth and nuance of human voices, there lived a powerful AI named Orpheus. Its voice could convey emotions, tell stories, and connect with people in ways never before imagined.",
+    technical: "The Orpheus TTS system utilizes a three billion parameter language model, fine-tuned specifically for speech synthesis. Operating at 24 kilohertz with 16-bit audio depth, it achieves real-time factor greater than 1.0x on modern GPUs.",
+    emotional: "I can't believe it's finally happening! After all this time, we did it! I'm just so happy right now. Thank you all for believing in this project.",
+    expressive: "Hmm, let me think about that for a moment. Oh, excuse me, it's been a long day. But seriously, this is an interesting question. Though I must admit, it's more complex than I initially thought."
 };
 
 // Initialize on page load
@@ -41,6 +41,11 @@ function setupEventListeners() {
     // Voice selection
     document.querySelectorAll('.voice-card').forEach(card => {
         card.addEventListener('click', () => selectVoice(card.dataset.voice));
+    });
+    
+    // Emotion buttons
+    document.querySelectorAll('.emotion-btn').forEach(btn => {
+        btn.addEventListener('click', () => insertEmotionTag(btn.dataset.tag));
     });
     
     // Buttons
@@ -522,6 +527,44 @@ async function updateSystemStats() {
     } catch (error) {
         console.error('Error updating system stats:', error);
     }
+}
+
+// Insert emotion tag at cursor position
+function insertEmotionTag(tag) {
+    const textInput = document.getElementById('text-input');
+    const cursorPos = textInput.selectionStart;
+    const textBefore = textInput.value.substring(0, cursorPos);
+    const textAfter = textInput.value.substring(cursorPos);
+    
+    // Add space before tag if needed
+    const needsSpaceBefore = textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n');
+    const spaceBefore = needsSpaceBefore ? ' ' : '';
+    
+    // Add space after tag if there's text after and it doesn't start with space or punctuation
+    const needsSpaceAfter = textAfter.length > 0 && !textAfter.startsWith(' ') && !textAfter.startsWith('\n') && !/^[.,!?;:]/.test(textAfter);
+    const spaceAfter = needsSpaceAfter ? ' ' : '';
+    
+    const emotionTag = `${spaceBefore}<${tag}>${spaceAfter}`;
+    
+    // Insert the tag
+    textInput.value = textBefore + emotionTag + textAfter;
+    
+    // Move cursor to after the inserted tag
+    const newCursorPos = cursorPos + emotionTag.length;
+    textInput.setSelectionRange(newCursorPos, newCursorPos);
+    
+    // Focus back on text input
+    textInput.focus();
+    
+    // Update stats
+    updateTextStats();
+    
+    // Visual feedback
+    const btn = document.querySelector(`[data-tag="${tag}"]`);
+    btn.style.transform = 'scale(0.9)';
+    setTimeout(() => {
+        btn.style.transform = '';
+    }, 150);
 }
 
 // Handle window close - cleanup audio context

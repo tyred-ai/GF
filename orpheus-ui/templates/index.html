@@ -138,25 +138,45 @@
                         </div>
                     </div>
                     <div class="card-body">
+                        <!-- Emotion Tag Toolbar -->
+                        <div class="emotion-toolbar">
+                            <span class="toolbar-label">Quick Emotions:</span>
+                            <button type="button" class="emotion-btn" data-tag="laugh" title="Insert laughter">
+                                <i class="fas fa-laugh"></i> laugh
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="sigh" title="Insert sighing">
+                                <i class="fas fa-tired"></i> sigh
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="chuckle" title="Insert chuckling">
+                                <i class="fas fa-smile"></i> chuckle
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="gasp" title="Insert gasping">
+                                <i class="fas fa-surprise"></i> gasp
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="yawn" title="Insert yawning">
+                                <i class="fas fa-bed"></i> yawn
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="cough" title="Insert coughing">
+                                <i class="fas fa-head-side-cough"></i> cough
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="groan" title="Insert groaning">
+                                <i class="fas fa-frown"></i> groan
+                            </button>
+                            <button type="button" class="emotion-btn" data-tag="sniffle" title="Insert sniffling">
+                                <i class="fas fa-sad-tear"></i> sniffle
+                            </button>
+                        </div>
+                        
                         <textarea id="text-input" placeholder="Enter your text here... 
 
-You can write multiple paragraphs here. The text box will expand as needed.
-
-Emotion tags supported:
-• <laugh> - Laughter
-• <sigh> - Sighing
-• <cough> - Coughing
-• <chuckle> - Chuckling
-• <sniffle> - Sniffling
-• <groan> - Groaning
-• <yawn> - Yawning
-• <gasp> - Gasping
+Click the emotion buttons above to insert tags, or type them manually.
 
 Example: Hello there! <laugh> This is amazing!" rows="20"></textarea>
                         <div class="text-stats">
                             <span>Characters: <strong id="char-count">0</strong></span>
                             <span>Words: <strong id="word-count">0</strong></span>
                             <span>Est. Duration: <strong id="est-duration">0s</strong></span>
+                            <span class="emotion-help">💡 Use emotion buttons above or type tags like <code>&lt;laugh&gt;</code></span>
                         </div>
                     </div>
                 </div>
