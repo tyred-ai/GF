@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orpheus TTS Enterprise - Text to Speech Platform</title>
+    <title>ORPHEUS - Advanced Text to Speech</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -13,20 +13,23 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
-                <div class="logo-section">
-                    <i class="fas fa-microphone-alt logo-icon"></i>
-                    <h1>Orpheus TTS Enterprise</h1>
-                    <span class="version-badge">v1.0</span>
+                <div class="logo-section-centered">
+                    <h1 class="main-title">ORPHEUS</h1>
+                    <div class="subtitle">ADVANCED NEURAL SPEECH SYNTHESIS</div>
                 </div>
-                <div class="header-stats">
-                    <div class="stat-item">
-                        <i class="fas fa-server"></i>
-                        <span id="model-status" class="status-indicator">Loading...</span>
-                    </div>
-                    <div class="stat-item">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>RTX 5090</span>
-                    </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <i class="fas fa-server"></i>
+                    <span id="model-status" class="status-indicator">Loading...</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-microchip"></i>
+                    <span class="gpu-badge">RTX 5090</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-bolt"></i>
+                    <span class="latency-badge">~200ms</span>
                 </div>
             </div>
         </header>
@@ -37,26 +40,84 @@
             <aside class="sidebar">
                 <div class="sidebar-section">
                     <h3><i class="fas fa-history"></i> Recent Sessions</h3>
+                    <div style="margin-bottom: 0.5rem;">
+                        <button id="clear-all-sessions-btn" class="btn btn-danger" style="width: 100%; font-size: 0.875rem;">
+                            <i class="fas fa-trash-alt"></i> Clear All Sessions
+                        </button>
+                    </div>
                     <div id="session-list" class="session-list">
                         <!-- Sessions will be loaded here -->
                     </div>
                 </div>
                 
                 <div class="sidebar-section">
-                    <h3><i class="fas fa-cog"></i> Settings</h3>
+                    <h3><i class="fas fa-chart-bar"></i> System Stats</h3>
+                    <div class="system-stats">
+                        <div class="stat-row">
+                            <span class="stat-name">Model Status</span>
+                            <span id="model-status-2" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-name">Total Sessions</span>
+                            <span id="total-sessions" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-name">Avg Gen Time</span>
+                            <span id="avg-gen-time" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-name">Avg TPS</span>
+                            <span id="avg-tps" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-name">GPU Memory</span>
+                            <span id="gpu-memory" class="stat-value">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-cog"></i> Advanced Settings</h3>
                     <div class="settings-group">
-                        <label for="temperature">Temperature</label>
-                        <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.6">
-                        <span id="temp-value">0.6</span>
+                        <label for="temperature" title="Controls randomness. Lower = more consistent, Higher = more varied">
+                            Temperature <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
+                        </label>
+                        <input type="range" id="temperature" min="0.1" max="1.0" step="0.1" value="0.4">
+                        <span id="temp-value">0.4</span>
+                        <small style="display: block; margin-top: 0.25rem; color: #64748b;">Lower = consistent, Higher = varied speech</small>
                     </div>
                     <div class="settings-group">
-                        <label for="top-p">Top-P</label>
-                        <input type="range" id="top-p" min="0" max="1" step="0.1" value="0.8">
-                        <span id="top-p-value">0.8</span>
+                        <label for="top-p" title="Nucleus sampling. Controls diversity of speech patterns">
+                            Top-P <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
+                        </label>
+                        <input type="range" id="top-p" min="0.1" max="1.0" step="0.1" value="0.9">
+                        <span id="top-p-value">0.9</span>
+                        <small style="display: block; margin-top: 0.25rem; color: #64748b;">Lower = focused, Higher = diverse</small>
                     </div>
                     <div class="settings-group">
-                        <label for="max-tokens">Max Tokens</label>
-                        <input type="number" id="max-tokens" min="100" max="2000" value="1200">
+                        <label for="repetition-penalty" title="Prevents repetition. Higher values make speech faster">
+                            Repetition Penalty <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
+                        </label>
+                        <input type="range" id="repetition-penalty" min="1.0" max="1.5" step="0.05" value="1.1">
+                        <span id="rep-penalty-value">1.1</span>
+                        <small style="display: block; margin-top: 0.25rem; color: #64748b;">≥1.1 required for stability. Higher = faster speech</small>
+                    </div>
+                    <div class="settings-group">
+                        <label for="max-tokens" title="Maximum audio length in tokens (0 = unlimited)">
+                            Max Tokens <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #00ff88;"></i>
+                        </label>
+                        <input type="number" id="max-tokens" min="0" max="10000" value="4096">
+                        <small style="display: block; margin-top: 0.25rem; color: #00ff88;">0 = unlimited, Default: 4096</small>
+                        <div style="margin-top: 0.5rem;">
+                            <button id="set-unlimited-btn" class="btn btn-secondary" style="width: 100%; font-size: 0.875rem;">
+                                <i class="fas fa-infinity"></i> Set Unlimited
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <button id="reset-settings-btn" class="btn btn-secondary" style="width: 100%;">
+                            <i class="fas fa-undo"></i> Reset to Defaults
+                        </button>
                     </div>
                 </div>
             </aside>
@@ -77,7 +138,19 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <textarea id="text-input" placeholder="Enter your text here... You can use emotion tags like <laugh> or <sigh> for more expressive speech." rows="8"></textarea>
+                        <textarea id="text-input" placeholder="Enter your text here... 
+
+Emotion tags supported:
+• <laugh> - Laughter
+• <sigh> - Sighing
+• <cough> - Coughing
+• <chuckle> - Chuckling
+• <sniffle> - Sniffling
+• <groan> - Groaning
+• <yawn> - Yawning
+• <gasp> - Gasping
+
+Example: Hello there! <laugh> This is amazing!" rows="12"></textarea>
                         <div class="text-stats">
                             <span>Characters: <strong id="char-count">0</strong></span>
                             <span>Words: <strong id="word-count">0</strong></span>
@@ -93,45 +166,63 @@
                     </div>
                     <div class="card-body">
                         <div class="voice-grid">
-                            <div class="voice-card active" data-voice="leo">
-                                <i class="fas fa-user-tie"></i>
-                                <span>Leo</span>
-                                <small>Professional</small>
-                            </div>
-                            <div class="voice-card" data-voice="tara">
-                                <i class="fas fa-user"></i>
+                            <!-- Top Row: Girls with Photos + 1 -->
+                            <div class="voice-card active female-voice" data-voice="tara">
+                                <div class="voice-avatar">
+                                    <img src="/static/images/tara.jpg" alt="Tara" class="voice-photo">
+                                </div>
                                 <span>Tara</span>
                                 <small>Conversational</small>
                             </div>
-                            <div class="voice-card" data-voice="zoe">
-                                <i class="fas fa-user"></i>
-                                <span>Zoe</span>
-                                <small>Friendly</small>
-                            </div>
-                            <div class="voice-card" data-voice="zac">
-                                <i class="fas fa-user-tie"></i>
-                                <span>Zac</span>
-                                <small>Authoritative</small>
-                            </div>
-                            <div class="voice-card" data-voice="jess">
-                                <i class="fas fa-user"></i>
-                                <span>Jess</span>
-                                <small>Energetic</small>
-                            </div>
-                            <div class="voice-card" data-voice="mia">
-                                <i class="fas fa-user"></i>
+                            <div class="voice-card female-voice" data-voice="mia">
+                                <div class="voice-avatar">
+                                    <img src="/static/images/mia.jpg" alt="Mia" class="voice-photo">
+                                </div>
                                 <span>Mia</span>
                                 <small>Warm</small>
                             </div>
-                            <div class="voice-card" data-voice="julia">
-                                <i class="fas fa-user"></i>
+                            <div class="voice-card female-voice" data-voice="leah">
+                                <div class="voice-avatar">
+                                    <img src="/static/images/leah.jpg" alt="Leah" class="voice-photo">
+                                </div>
+                                <span>Leah</span>
+                                <small>Smooth</small>
+                            </div>
+                            <div class="voice-card female-voice" data-voice="zoe">
+                                <div class="voice-avatar">
+                                    <i class="fas fa-venus"></i>
+                                </div>
+                                <span>Zoe</span>
+                                <small>Friendly</small>
+                            </div>
+                            <!-- Bottom Row: Remaining Girls + Guys -->
+                            <div class="voice-card female-voice" data-voice="jess">
+                                <div class="voice-avatar">
+                                    <i class="fas fa-venus"></i>
+                                </div>
+                                <span>Jess</span>
+                                <small>Energetic</small>
+                            </div>
+                            <div class="voice-card female-voice" data-voice="julia">
+                                <div class="voice-avatar">
+                                    <i class="fas fa-venus"></i>
+                                </div>
                                 <span>Julia</span>
                                 <small>Clear</small>
                             </div>
-                            <div class="voice-card" data-voice="leah">
-                                <i class="fas fa-user"></i>
-                                <span>Leah</span>
-                                <small>Smooth</small>
+                            <div class="voice-card male-voice" data-voice="leo">
+                                <div class="voice-avatar">
+                                    <i class="fas fa-mars"></i>
+                                </div>
+                                <span>Leo</span>
+                                <small>Professional</small>
+                            </div>
+                            <div class="voice-card male-voice" data-voice="zac">
+                                <div class="voice-avatar">
+                                    <i class="fas fa-mars"></i>
+                                </div>
+                                <span>Zac</span>
+                                <small>Authoritative</small>
                             </div>
                         </div>
                     </div>
@@ -141,9 +232,6 @@
                 <div class="action-section">
                     <button id="generate-btn" class="btn btn-primary btn-large">
                         <i class="fas fa-play-circle"></i> Generate Speech
-                    </button>
-                    <button id="stream-btn" class="btn btn-secondary btn-large">
-                        <i class="fas fa-stream"></i> Stream Real-time
                     </button>
                 </div>
 
@@ -167,6 +255,51 @@
                                 <div class="info-item">
                                     <i class="fas fa-user"></i>
                                     <span>Voice: <strong id="audio-voice">-</strong></span>
+                                </div>
+                            </div>
+                            <!-- Advanced Stats Section -->
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">Generation Time</span>
+                                        <span class="stat-value" id="gen-time">-</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="fas fa-coins"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">Tokens Generated</span>
+                                        <span class="stat-value" id="tokens-count">-</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="fas fa-rocket"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">Tokens/Second</span>
+                                        <span class="stat-value" id="tps-rate">-</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="fas fa-chart-line"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">Real-Time Factor</span>
+                                        <span class="stat-value" id="rtf-ratio">-</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="fas fa-microchip"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">GPU Utilization</span>
+                                        <span class="stat-value" id="gpu-util">85%</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="fas fa-wave-square"></i>
+                                    <div class="stat-content">
+                                        <span class="stat-label">Sample Rate</span>
+                                        <span class="stat-value">24 kHz</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -198,8 +331,8 @@
         <!-- Footer -->
         <footer class="app-footer">
             <div class="footer-content">
-                <span>Powered by Orpheus TTS + vLLM | RTX 5090 32GB</span>
-                <span>© 2024 Enterprise Edition</span>
+                <span class="footer-tech">ORPHEUS 3B • vLLM 0.10.0 • CUDA 12.8</span>
+                <span class="footer-gpu">RTX 5090 32GB VRAM</span>
             </div>
         </footer>
     </div>
@@ -230,6 +363,14 @@
                 <div class="sample-item" onclick="loadSample('technical')">
                     <h4>Technical Documentation</h4>
                     <p>The Orpheus TTS system utilizes a three billion parameter language model, fine-tuned specifically for speech synthesis. Operating at 24 kilohertz with 16-bit audio depth, it achieves real-time factor greater than 1.0x on modern GPUs.</p>
+                </div>
+                <div class="sample-item" onclick="loadSample('emotional')">
+                    <h4>Emotional Expression</h4>
+                    <p>I can't believe it's finally happening! &lt;laugh&gt; After all this time, we did it! &lt;sniffle&gt; I'm just so happy right now. &lt;sigh&gt; Thank you all for believing in this project.</p>
+                </div>
+                <div class="sample-item" onclick="loadSample('expressive')">
+                    <h4>Natural Expressions</h4>
+                    <p>Hmm, let me think about that for a moment. &lt;yawn&gt; Oh, excuse me, it's been a long day. &lt;chuckle&gt; But seriously, this is an interesting question. &lt;groan&gt; Though I must admit, it's more complex than I initially thought.</p>
                 </div>
             </div>
         </div>

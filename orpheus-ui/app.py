@@ -66,12 +66,12 @@ LAST_STATS = {}
 # Request models
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "leo"
+    voice: str = "tara"  # Changed default to tara
     session_id: Optional[str] = None
-    temperature: Optional[float] = 0.6
-    top_p: Optional[float] = 0.8
-    repetition_penalty: Optional[float] = 1.0
-    max_tokens: Optional[int] = 1200
+    temperature: Optional[float] = 0.4
+    top_p: Optional[float] = 0.9
+    repetition_penalty: Optional[float] = 1.2  # Increased to prevent repetition
+    max_tokens: Optional[int] = 4096  # Increased default
 
 class SessionResponse(BaseModel):
     session_id: str
@@ -82,6 +82,7 @@ class SessionResponse(BaseModel):
     file_size: Optional[int] = None
     tokens: Optional[int] = None
     tps: Optional[float] = None
+    elapsed_ms: Optional[int] = None  # Add elapsed_ms field
 
 def init_global_model():
     """Initialize the Orpheus model with optimized vLLM settings"""
@@ -165,7 +166,10 @@ async def get_sessions():
             "voice": session_data.get("voice", "unknown"),
             "timestamp": session_data.get("timestamp", ""),
             "duration": session_data.get("duration", 0),
-            "status": session_data.get("status", "unknown")
+            "status": session_data.get("status", "unknown"),
+            "tokens": session_data.get("tokens", 0),
+            "tps": session_data.get("tps", 0),
+            "elapsed_ms": session_data.get("elapsed_ms", 0)
         })
     return {"sessions": sorted(sessions_list, key=lambda x: x["timestamp"], reverse=True)}
 
@@ -192,7 +196,8 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
         "temperature": temperature,
         "top_p": top_p,
         "repetition_penalty": repetition_penalty,
-        "max_tokens": max_tokens
+        "max_tokens": max_tokens if max_tokens > 0 else 10000,  # 0 means unlimited (use high value)
+        "stop_token_ids": [128258]  # Stop token to prevent repetition at end
     }
     
     # Generate audio chunks
@@ -218,11 +223,41 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     # Combine chunks into audio
     pcm_bytes = b"".join(chunks)
     
-    # Add short trailing pad to avoid truncating sentence tails
+    # Add padding and smoothing to avoid truncating audio
     if pcm_bytes:
-        pad_samples = int(0.08 * 24000)  # 80ms pad
-        pad_bytes = np.zeros(pad_samples, dtype=np.int16).tobytes()
-        pcm_bytes = pcm_bytes + pad_bytes
+        # Get padding settings from environment or use defaults
+        lead_pad_ms = int(os.getenv("ORPHEUS_LEAD_PAD_MS", "50"))
+        trail_pad_ms = int(os.getenv("ORPHEUS_TRAIL_PAD_MS", "150"))
+        
+        # Convert to numpy array for processing (make a copy so it's writable)
+        audio_array = np.frombuffer(pcm_bytes, dtype=np.int16).copy()
+        
+        # Add fade-in (10ms) to prevent pops at the start
+        fade_in_samples = int(0.01 * 24000)  # 10ms
+        if len(audio_array) > fade_in_samples:
+            fade_in = np.linspace(0, 1, fade_in_samples)
+            audio_array[:fade_in_samples] = (audio_array[:fade_in_samples] * fade_in).astype(np.int16)
+        
+        # Add fade-out (20ms) to prevent clicks at the end
+        fade_out_samples = int(0.02 * 24000)  # 20ms
+        if len(audio_array) > fade_out_samples:
+            fade_out = np.linspace(1, 0, fade_out_samples)
+            audio_array[-fade_out_samples:] = (audio_array[-fade_out_samples:] * fade_out).astype(np.int16)
+        
+        # Add silence padding
+        lead_samples = int((lead_pad_ms / 1000.0) * 24000)
+        trail_samples = int((trail_pad_ms / 1000.0) * 24000)
+        
+        # Combine with padding
+        padded_audio = np.concatenate([
+            np.zeros(lead_samples, dtype=np.int16),  # Lead silence
+            audio_array,                              # Main audio with fades
+            np.zeros(trail_samples, dtype=np.int16)   # Trail silence
+        ])
+        
+        pcm_bytes = padded_audio.tobytes()
+        
+        print(f"Added {lead_pad_ms}ms lead and {trail_pad_ms}ms trail padding with fade in/out")
     
     # Calculate stats
     elapsed_ms = int((time.time() - start_time) * 1000)
@@ -297,7 +332,8 @@ async def generate_speech(request: TTSRequest):
             "duration": audio_seconds,
             "file_size": file_size,
             "tokens": tokens,
-            "tps": tps
+            "tps": tps,
+            "elapsed_ms": elapsed_ms  # Store elapsed_ms in session
         })
         
         return SessionResponse(
@@ -308,7 +344,8 @@ async def generate_speech(request: TTSRequest):
             duration=audio_seconds,
             file_size=file_size,
             tokens=tokens,
-            tps=round(tps, 2)
+            tps=round(tps, 2),
+            elapsed_ms=elapsed_ms
         )
         
     except Exception as e:
