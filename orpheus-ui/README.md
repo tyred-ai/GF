@@ -3,6 +3,10 @@
   cd /home/lightning/Documents/Stream/vllm-orpheus-setup/orpheus-ui
   ./launch.sh
 
+
+  cd /home/lightning/Documents/Stream/vllm-orpheus-setup/orpheus-ui && source ../vllm-env/bin/activate && python app.py
+
+  
 A modern, enterprise-grade web interface for Orpheus TTS with real-time streaming capabilities.
 
 ## Features

@@ -1,5 +1,8 @@
 # Orpheus TTS with vLLM - Complete Setup Guide
 
+  cd /home/lightning/Documents/Stream/vllm-orpheus-setup/orpheus-ui
+  ./launch.sh
+  
 ## 🚀 Quick Overview
 
 Production-ready **Orpheus TTS** system with modern web UI, optimized for NVIDIA RTX 5090 (32GB VRAM) using vLLM for ~200ms latency speech synthesis. Features real-time voice generation with 8 personas, emotion tags, and comprehensive performance monitoring.

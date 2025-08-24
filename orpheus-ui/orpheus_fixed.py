@@ -22,16 +22,16 @@ class OrpheusModelFixed:
         self.tokeniser = AutoTokenizer.from_pretrained(model_name)
     
     def _setup_engine(self):
-        """Setup engine with chunked prefill forcefully disabled"""
+        """Setup engine with chunked prefill enabled for better performance"""
         engine_args = AsyncEngineArgs(
             model=self.model_name,
             dtype=self.dtype,
-            # CRITICAL: Force disable chunked prefill to prevent word skipping
-            enable_chunked_prefill=False,
-            max_model_len=16384,  # Keep under 32k to avoid auto-enable
+            # Enable chunked prefill for better performance
+            enable_chunked_prefill=True,
+            max_model_len=32768,  # Increased for chunked prefill
             gpu_memory_utilization=0.85,
             max_num_seqs=1,
-            enforce_eager=True,  # Disable CUDA graphs
+            enforce_eager=False,  # Enable CUDA graphs for performance
             enable_prefix_caching=False,
         )
         return AsyncLLMEngine.from_engine_args(engine_args)
