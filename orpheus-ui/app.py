@@ -100,14 +100,14 @@ def init_global_model():
     
     # CRITICAL: Set vLLM environment variables BEFORE importing orpheus_tts
     # These must be set before the module loads vLLM
-    os.environ["VLLM_GPU_MEM_UTIL"] = "0.85"
+    os.environ["VLLM_GPU_MEM_UTIL"] = "0.75"  # Reduced from 0.85 to avoid OOM
     os.environ["VLLM_MAX_NUM_SEQS"] = "1"
-    os.environ["VLLM_ENABLE_CHUNKED_PREFILL"] = "1"  # ENABLED for better performance
-    os.environ["VLLM_CHUNKED_PREFILL_ENABLED"] = "true"  # Alternative env var
-    os.environ["ENABLE_CHUNKED_PREFILL"] = "true"  # Another alternative
+    os.environ["VLLM_ENABLE_CHUNKED_PREFILL"] = "0"  # DISABLED - causes OOM with large models
+    os.environ["VLLM_CHUNKED_PREFILL_ENABLED"] = "false"  # Alternative env var
+    os.environ["ENABLE_CHUNKED_PREFILL"] = "false"  # Another alternative
     os.environ["VLLM_ENABLE_PREFIX_CACHING"] = "0"
     os.environ["VLLM_KV_CACHE_DTYPE"] = "auto"
-    os.environ["VLLM_MAX_MODEL_LEN"] = "32768"  # Increased for chunked prefill
+    os.environ["VLLM_MAX_MODEL_LEN"] = "8192"  # Reduced to save memory
     os.environ["VLLM_USE_V1"] = "0"  # Use stable V0 engine
     os.environ["VLLM_SKIP_TOKENIZER_INIT"] = "0"  # Ensure proper tokenizer init
     
@@ -120,9 +120,9 @@ def init_global_model():
     
     print(f"Initializing Orpheus model with optimized settings:")
     print(f"  Model: {model_id}")
-    print(f"  GPU Memory Utilization: 0.85")
-    print(f"  Chunked Prefill: ENABLED")
-    print(f"  Max Model Length: 32768")
+    print(f"  GPU Memory Utilization: 0.75 (reduced to avoid OOM)")
+    print(f"  Chunked Prefill: DISABLED (causes OOM)")
+    print(f"  Max Model Length: 8192")
     print(f"  Stop Tokens: Fixed to use 128258 (not 49158)")
     
     # Initialize with our fixed model
