@@ -81,7 +81,26 @@ function updateTextStats() {
     const wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length;
     const estDuration = Math.max(1, Math.round(wordCount / 2.5)); // Rough estimate
     
-    document.getElementById('char-count').textContent = charCount;
+    // Update character count with limit indicator
+    const charCountElement = document.getElementById('char-count');
+    charCountElement.textContent = charCount;
+    
+    // Show warning if exceeds 770 characters
+    const warningElement = document.getElementById('char-limit-warning');
+    if (charCount > 770) {
+        charCountElement.style.color = '#ff6b6b';
+        charCountElement.parentElement.style.color = '#ff6b6b';
+        if (warningElement) {
+            warningElement.style.display = 'block';
+        }
+    } else {
+        charCountElement.style.color = '';
+        charCountElement.parentElement.style.color = '';
+        if (warningElement) {
+            warningElement.style.display = 'none';
+        }
+    }
+    
     document.getElementById('word-count').textContent = wordCount;
     document.getElementById('est-duration').textContent = `${estDuration}s`;
 }
@@ -99,6 +118,22 @@ async function generateSpeech() {
     if (!text) {
         showToast('Please enter some text to generate speech', 'warning');
         return;
+    }
+    
+    // Check character limit and warn user
+    if (text.length > 770) {
+        const proceed = confirm(
+            `⚠️ Warning: Your text is ${text.length} characters long.\n\n` +
+            `The Orpheus model performs best with texts under 770 characters. ` +
+            `Longer texts may cause hallucinations or incomplete speech generation.\n\n` +
+            `Do you want to continue anyway?\n\n` +
+            `Tip: Consider breaking your text into smaller segments for better results.`
+        );
+        
+        if (!proceed) {
+            showToast('Generation cancelled. Please shorten your text or split it into segments.', 'info');
+            return;
+        }
     }
     
     // Show progress

@@ -85,25 +85,25 @@
                         <label for="temperature" title="Controls randomness. Lower = more consistent, Higher = more varied">
                             Temperature <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
                         </label>
-                        <input type="range" id="temperature" min="0.1" max="1.0" step="0.1" value="0.4">
-                        <span id="temp-value">0.4</span>
+                        <input type="range" id="temperature" min="0.1" max="1.0" step="0.1" value="0.6">
+                        <span id="temp-value">0.6</span>
                         <small style="display: block; margin-top: 0.25rem; color: #64748b;">Lower = consistent, Higher = varied speech</small>
                     </div>
                     <div class="settings-group">
                         <label for="top-p" title="Nucleus sampling. Controls diversity of speech patterns">
                             Top-P <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
                         </label>
-                        <input type="range" id="top-p" min="0.1" max="1.0" step="0.1" value="0.9">
-                        <span id="top-p-value">0.9</span>
+                        <input type="range" id="top-p" min="0.1" max="1.0" step="0.1" value="0.8">
+                        <span id="top-p-value">0.8</span>
                         <small style="display: block; margin-top: 0.25rem; color: #64748b;">Lower = focused, Higher = diverse</small>
                     </div>
                     <div class="settings-group">
                         <label for="repetition-penalty" title="Prevents repetition. Higher values make speech faster">
                             Repetition Penalty <i class="fas fa-question-circle" style="font-size: 0.75rem; color: #64748b;"></i>
                         </label>
-                        <input type="range" id="repetition-penalty" min="1.0" max="1.5" step="0.05" value="1.1">
-                        <span id="rep-penalty-value">1.1</span>
-                        <small style="display: block; margin-top: 0.25rem; color: #64748b;">≥1.1 required for stability. Higher = faster speech</small>
+                        <input type="range" id="repetition-penalty" min="1.1" max="1.5" step="0.05" value="1.25">
+                        <span id="rep-penalty-value">1.25</span>
+                        <small style="display: block; margin-top: 0.25rem; color: #64748b;">Higher = faster speech, Lower = slower/dragged out (min 1.1)</small>
                     </div>
                     <div class="settings-group">
                         <label for="max-tokens" title="Maximum audio length in tokens (0 = unlimited)">
@@ -139,6 +139,10 @@
                                 <i class="fas fa-file-alt"></i> Load Sample
                             </button>
                         </div>
+                    </div>
+                    <div class="info-box" style="margin: 1rem 2rem 0 2rem; padding: 0.75rem; background: rgba(255, 255, 0, 0.05); border: 1px solid rgba(255, 255, 0, 0.2); border-radius: 0.25rem;">
+                        <i class="fas fa-info-circle" style="color: #ffff00;"></i> 
+                        <strong>Important:</strong> Keep text under <strong style="color: #ffff00;">770 characters</strong> for reliable speech. Longer texts often end with <strong style="color: #ff6b6b;">gibberish or rambling</strong> as the model loses coherence.
                     </div>
                     <div class="card-body">
                         <!-- Emotion Tag Toolbar -->
@@ -176,10 +180,13 @@ Click the emotion buttons above to insert tags, or type them manually.
 
 Example: Hello there! <laugh> This is amazing!" rows="20"></textarea>
                         <div class="text-stats">
-                            <span>Characters: <strong id="char-count">0</strong></span>
+                            <span>Characters: <strong id="char-count">0</strong> / 770</span>
                             <span>Words: <strong id="word-count">0</strong></span>
                             <span>Est. Duration: <strong id="est-duration">0s</strong></span>
                             <span class="emotion-help">💡 Use emotion buttons above or type tags like <code>&lt;laugh&gt;</code></span>
+                        </div>
+                        <div id="char-limit-warning" class="char-limit-warning" style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.25rem; color: #ff6b6b;">
+                            <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> Text exceeds 770 character limit. The model may hallucinate or fail to complete speech generation for longer texts. Consider breaking your text into smaller segments.
                         </div>
                     </div>
                 </div>

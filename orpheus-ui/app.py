@@ -19,6 +19,12 @@ import time
 import numpy as np
 import zipfile
 import tempfile
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in the same directory as this script
+script_dir = Path(__file__).parent
+env_path = script_dir / '.env'
+load_dotenv(env_path)
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -70,10 +76,10 @@ class TTSRequest(BaseModel):
     text: str
     voice: str = "tara"  # Changed default to tara
     session_id: Optional[str] = None
-    temperature: Optional[float] = 0.4
-    top_p: Optional[float] = 0.9
-    repetition_penalty: Optional[float] = 1.2  # Increased to prevent repetition
-    max_tokens: Optional[int] = 4096  # Increased default
+    temperature: Optional[float] = None  # Will use env default if not provided
+    top_p: Optional[float] = None  # Will use env default if not provided
+    repetition_penalty: Optional[float] = None  # Will use env default if not provided
+    max_tokens: Optional[int] = None  # Will use env default if not provided
 
 class SessionResponse(BaseModel):
     session_id: str
@@ -92,30 +98,36 @@ def init_global_model():
     if ORPHEUS_MODEL is not None:
         return ORPHEUS_MODEL
     
-    from orpheus_tts import OrpheusModel
+    # CRITICAL: Set vLLM environment variables BEFORE importing orpheus_tts
+    # These must be set before the module loads vLLM
+    os.environ["VLLM_GPU_MEM_UTIL"] = "0.85"
+    os.environ["VLLM_MAX_NUM_SEQS"] = "1"
+    os.environ["VLLM_ENABLE_CHUNKED_PREFILL"] = "0"  # DISABLE - prevents word skipping
+    os.environ["VLLM_CHUNKED_PREFILL_ENABLED"] = "false"  # Alternative env var
+    os.environ["ENABLE_CHUNKED_PREFILL"] = "false"  # Another alternative
+    os.environ["VLLM_ENABLE_PREFIX_CACHING"] = "0"
+    os.environ["VLLM_KV_CACHE_DTYPE"] = "auto"
+    # IMPORTANT: Keep max length under 32k to prevent auto-enabling chunked prefill
+    os.environ["VLLM_MAX_MODEL_LEN"] = "16384"  # Changed from 131072 to prevent chunked prefill
+    os.environ["VLLM_USE_V1"] = "0"  # Use stable V0 engine
+    os.environ["VLLM_SKIP_TOKENIZER_INIT"] = "0"  # Ensure proper tokenizer init
+    
+    # Now import after environment is configured
+    from orpheus_fixed import OrpheusModelFixed
     import torch
     
     # Model configuration
     model_id = os.getenv("ORPHEUS_MODEL_ID", "canopylabs/orpheus-3b-0.1-ft")
     
-    # Set vLLM environment variables for optimization
-    # These must be set before model initialization
-    os.environ["VLLM_GPU_MEM_UTIL"] = os.getenv("VLLM_GPU_MEM_UTIL", "0.85")
-    os.environ["VLLM_MAX_NUM_SEQS"] = os.getenv("VLLM_MAX_NUM_SEQS", "1")
-    os.environ["VLLM_ENFORCE_EAGER"] = os.getenv("VLLM_ENFORCE_EAGER", "0")
-    os.environ["VLLM_ENABLE_CHUNKED_PREFILL"] = os.getenv("VLLM_ENABLE_CHUNKED_PREFILL", "1")
-    os.environ["VLLM_ENABLE_PREFIX_CACHING"] = os.getenv("VLLM_ENABLE_PREFIX_CACHING", "0")
-    os.environ["VLLM_KV_CACHE_DTYPE"] = os.getenv("VLLM_KV_CACHE_DTYPE", "auto")
-    os.environ["VLLM_MAX_MODEL_LEN"] = os.getenv("VLLM_MAX_MODEL_LEN", "8192")
-    
-    print(f"Initializing Orpheus model with optimized settings:")
+    print(f"Initializing Orpheus model with FIXED settings:")
     print(f"  Model: {model_id}")
-    print(f"  GPU Memory Utilization: {os.environ['VLLM_GPU_MEM_UTIL']}")
-    print(f"  Max Model Length: {os.environ['VLLM_MAX_MODEL_LEN']}")
-    print(f"  KV Cache Type: {os.environ['VLLM_KV_CACHE_DTYPE']}")
+    print(f"  GPU Memory Utilization: 0.85")
+    print(f"  Chunked Prefill: FORCEFULLY DISABLED")
+    print(f"  Max Model Length: 16384 (to prevent auto-enable)")
+    print(f"  Stop Tokens: Fixed to use 128258 (not 49158)")
     
-    # OrpheusModel only accepts model_name and dtype
-    ORPHEUS_MODEL = OrpheusModel(
+    # Initialize with our fixed model
+    ORPHEUS_MODEL = OrpheusModelFixed(
         model_name=model_id,
         dtype=torch.bfloat16  # Optimal for RTX 5090
     )
@@ -175,11 +187,42 @@ async def get_sessions():
         })
     return {"sessions": sorted(sessions_list, key=lambda x: x["timestamp"], reverse=True)}
 
+def preprocess_text_for_tts(text: str) -> str:
+    """Preprocess text to work around vLLM/Orpheus issues"""
+    # Strip leading/trailing whitespace and hidden characters
+    text = text.strip()
+    
+    # Remove zero-width spaces and other invisible characters
+    text = text.replace('\u200b', '').replace('\ufeff', '').replace('\u00ad', '')
+    
+    # Clean up excessive whitespace
+    text = ' '.join(text.split())
+    
+    # Replace paragraph breaks with pause markers
+    text = text.replace('\n\n', '. ').replace('\n', ' ')
+    
+    # Check if text starts with an emotion tag
+    has_starting_emotion = text.startswith('<')
+    
+    # CRITICAL FIX: Add a single period as prefix ONLY if no emotion tag at start
+    # This creates a brief pause that initializes vLLM properly
+    # without adding audible speech
+    if not has_starting_emotion:
+        text = ". " + text
+        print(f"Processing text: {len(text)} chars (with period prefix)")
+    else:
+        print(f"Processing text: {len(text)} chars (starts with emotion tag, no prefix added)")
+    
+    return text
+
 async def generate_audio_async(text: str, voice: str, session_id: str, 
-                              temperature: float = 0.6, top_p: float = 0.8,
-                              repetition_penalty: float = 1.0, max_tokens: int = 1200):
+                              temperature: Optional[float] = None, top_p: Optional[float] = None,
+                              repetition_penalty: Optional[float] = None, max_tokens: Optional[int] = None):
     """Generate audio asynchronously"""
     global ORPHEUS_MODEL, LAST_STATS
+    
+    # Preprocess text to prevent word skipping
+    text = preprocess_text_for_tts(text)
     
     # Initialize model if needed
     async with MODEL_LOCK:
@@ -190,16 +233,39 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     request_id = f"web-{session_id}"
     start_time = time.time()
     
-    # Prepare generation kwargs
+    # Get defaults from environment
+    default_temp = float(os.getenv("ORPHEUS_DEFAULT_TEMPERATURE", "0.4"))
+    default_top_p = float(os.getenv("ORPHEUS_DEFAULT_TOP_P", "0.9"))
+    default_rep_penalty = float(os.getenv("ORPHEUS_DEFAULT_REPETITION_PENALTY", "1.1"))
+    
+    # Calculate appropriate max_tokens based on text length to prevent over-generation
+    # Roughly 15-20 tokens per word, and we want some buffer but not too much
+    word_count = len(text.split())
+    
+    # Count emotion tags (they need extra tokens)
+    emotion_tags = text.count('<') + text.count('>')
+    emotion_token_buffer = emotion_tags * 50  # Extra tokens for emotion expressions
+    
+    estimated_tokens = word_count * 20 + emotion_token_buffer  # Conservative estimate
+    default_max_tokens = min(estimated_tokens + 500, 4096)  # Add buffer but cap at 4096
+    
+    # Fix max_tokens: Never allow 0, use calculated default if not specified
+    if max_tokens is None or max_tokens <= 0:
+        max_tokens = default_max_tokens
+    
+    print(f"Text words: {word_count}, estimated tokens: {estimated_tokens}, using max_tokens: {max_tokens}")
+    
+    # WORKAROUND: Use correct stop tokens and parameters for Orpheus
+    # The default stop token (49158) is wrong, should be 128258
     gen_kwargs = {
         "prompt": text,
         "voice": voice,
         "request_id": request_id,
-        "temperature": temperature,
-        "top_p": top_p,
-        "repetition_penalty": repetition_penalty,
-        "max_tokens": max_tokens if max_tokens > 0 else 10000,  # 0 means unlimited (use high value)
-        "stop_token_ids": [128258]  # Stop token to prevent repetition at end
+        "temperature": temperature if temperature is not None else default_temp,
+        "top_p": top_p if top_p is not None else default_top_p,
+        "repetition_penalty": repetition_penalty if repetition_penalty is not None else default_rep_penalty,
+        "max_tokens": max_tokens,  # Now guaranteed to be at least 1
+        "stop_token_ids": [128258],  # Correct EOS token for Orpheus (not 49158)
     }
     
     # Generate audio chunks
@@ -236,11 +302,134 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
     # Add padding and smoothing to avoid truncating audio
     if pcm_bytes:
         # Get padding settings from environment or use defaults
-        lead_pad_ms = int(os.getenv("ORPHEUS_LEAD_PAD_MS", "50"))
+        # Reduced lead padding since we're using a prefix now
+        lead_pad_ms = int(os.getenv("ORPHEUS_LEAD_PAD_MS", "100"))  # Reduced to 100ms
         trail_pad_ms = int(os.getenv("ORPHEUS_TRAIL_PAD_MS", "150"))
         
         # Convert to numpy array for processing (make a copy so it's writable)
         audio_array = np.frombuffer(pcm_bytes, dtype=np.int16).copy()
+        
+        # Check if text ends with emotion tag - if so, be more conservative with trimming
+        has_ending_emotion = '>' in text[-20:] and text.rstrip().endswith('>')
+        
+        # IMPORTANT: Detect and remove gibberish at the end
+        # The model sometimes generates random audio after the actual speech ends
+        # This typically manifests as repetitive patterns or noise
+        # Be more conservative if there's an emotion tag at the end
+        if len(audio_array) > 24000 and not has_ending_emotion:  # Only process if > 1 second and no ending emotion
+            # Analyze the last 1 second for gibberish patterns
+            last_second = audio_array[-24000:]
+            
+            # Calculate energy in sliding windows
+            window_size = 2400  # 100ms windows
+            energies = []
+            for i in range(0, len(last_second) - window_size, window_size):
+                window = last_second[i:i+window_size]
+                energy = np.sqrt(np.mean(window.astype(np.float32)**2))
+                energies.append(energy)
+            
+            # Check for repetitive low-energy patterns (common in gibberish)
+            if len(energies) > 3:
+                avg_energy = np.mean(energies)
+                last_3_energy = np.mean(energies[-3:])
+                
+                # Multiple detection methods for gibberish
+                trim_needed = False
+                trim_point = len(audio_array)
+                
+                # Method 1: Low energy detection
+                if last_3_energy < avg_energy * 0.1:
+                    trim_needed = True
+                    for i in range(len(energies) - 1, -1, -1):
+                        if energies[i] > avg_energy * 0.3:
+                            trim_point = len(audio_array) - 24000 + (i + 1) * window_size
+                            break
+                
+                # Method 2: Detect repetitive patterns (common in model hallucination)
+                if not trim_needed and len(audio_array) > 48000:  # Need at least 2 seconds
+                    # Compare last 500ms with previous 500ms
+                    segment_size = 12000  # 500ms
+                    last_segment = audio_array[-segment_size:]
+                    prev_segment = audio_array[-segment_size*2:-segment_size]
+                    
+                    # Calculate correlation between segments
+                    correlation = np.corrcoef(last_segment.astype(np.float32), prev_segment.astype(np.float32))[0, 1]
+                    
+                    # High correlation suggests repetitive pattern (gibberish)
+                    if correlation > 0.8:
+                        print(f"Detected repetitive pattern (correlation: {correlation:.3f})")
+                        # Find where the repetition starts
+                        for offset in range(segment_size, len(audio_array)//2, segment_size//4):
+                            test_segment = audio_array[-offset-segment_size:-offset]
+                            test_correlation = np.corrcoef(last_segment.astype(np.float32), test_segment.astype(np.float32))[0, 1]
+                            if test_correlation < 0.5:
+                                # Found non-repetitive section
+                                trim_point = min(trim_point, len(audio_array) - offset + segment_size//2)
+                                trim_needed = True
+                                break
+                
+                # Method 3: Detect sudden energy spike at the end (another hallucination pattern)
+                if not trim_needed and len(energies) > 5:
+                    baseline_energy = np.median(energies[:-2])
+                    if energies[-1] > baseline_energy * 3 or energies[-2] > baseline_energy * 3:
+                        print("Detected energy spike at end (possible gibberish)")
+                        # Trim to before the spike
+                        for i in range(len(energies) - 1, -1, -1):
+                            if energies[i] < baseline_energy * 1.5:
+                                trim_point = len(audio_array) - 24000 + (i + 1) * window_size
+                                trim_needed = True
+                                break
+                
+                if trim_needed and trim_point < len(audio_array):
+                    trimmed_duration = (len(audio_array) - trim_point) / 24000
+                    audio_array = audio_array[:trim_point]
+                    print(f"Trimmed {trimmed_duration:.2f}s of potential gibberish/hallucination")
+        
+        elif has_ending_emotion and len(audio_array) > 24000:
+            # Conservative trimming for texts ending with emotion tags
+            # Only remove very obvious silence or extreme gibberish
+            print("Text ends with emotion tag, using conservative end trimming")
+            
+            # Look for extended silence at the very end (> 500ms)
+            silence_threshold = np.max(np.abs(audio_array)) * 0.02  # Very low threshold
+            silence_samples = 0
+            
+            # Count silence from the end
+            for i in range(len(audio_array) - 1, max(0, len(audio_array) - 24000), -1):
+                if np.abs(audio_array[i]) < silence_threshold:
+                    silence_samples += 1
+                else:
+                    break
+            
+            # Only trim if there's more than 500ms of silence
+            if silence_samples > 12000:  # 500ms at 24kHz
+                audio_array = audio_array[:-silence_samples + 2400]  # Keep 100ms of silence
+                print(f"Trimmed {(silence_samples - 2400)/24000:.2f}s of trailing silence after emotion")
+        
+        # Check if text starts with emotion tag - if so, don't trim beginning
+        has_starting_emotion = text.startswith('<') and '>' in text[:20]
+        
+        if not has_starting_emotion:
+            # WORKAROUND: Trim the period prefix silence from the beginning
+            # The period creates a brief pause (usually 200-300ms)
+            trim_samples = int(0.3 * 24000)  # 300ms max for the period pause
+            if len(audio_array) > trim_samples * 2:  # Only trim if we have enough audio
+                # Find where actual speech starts after the silence
+                threshold = np.max(np.abs(audio_array)) * 0.1
+                
+                # Find the first significant audio (speech start)
+                speech_start = None
+                for i in range(0, trim_samples):
+                    if np.abs(audio_array[i]) > threshold:
+                        # Found speech, back up slightly for smooth transition
+                        speech_start = max(0, i - int(0.01 * 24000))  # 10ms back
+                        break
+                
+                if speech_start and speech_start > int(0.05 * 24000):  # Only trim if there's actual silence
+                    audio_array = audio_array[speech_start:]
+                    print(f"Trimmed {speech_start/24000:.3f}s of prefix silence")
+        else:
+            print("Text starts with emotion tag, preserving beginning audio")
         
         # Add fade-in (10ms) to prevent pops at the start
         fade_in_samples = int(0.01 * 24000)  # 10ms
@@ -254,9 +443,16 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
             fade_out = np.linspace(1, 0, fade_out_samples)
             audio_array[-fade_out_samples:] = (audio_array[-fade_out_samples:] * fade_out).astype(np.int16)
         
-        # Add silence padding
-        lead_samples = int((lead_pad_ms / 1000.0) * 24000)
-        trail_samples = int((trail_pad_ms / 1000.0) * 24000)
+        # Add silence padding - more padding for emotion tags
+        if has_starting_emotion:
+            lead_samples = int((max(lead_pad_ms, 150) / 1000.0) * 24000)  # At least 150ms for emotion tags
+        else:
+            lead_samples = int((lead_pad_ms / 1000.0) * 24000)
+        
+        if has_ending_emotion:
+            trail_samples = int((max(trail_pad_ms, 200) / 1000.0) * 24000)  # At least 200ms for emotion tags
+        else:
+            trail_samples = int((trail_pad_ms / 1000.0) * 24000)
         
         # Combine with padding
         padded_audio = np.concatenate([
@@ -297,6 +493,13 @@ async def generate_audio_async(text: str, voice: str, session_id: str,
 async def generate_speech(request: TTSRequest):
     """Generate speech from text with optimized model"""
     try:
+        # Check character limit and warn if exceeded
+        text_length = len(request.text)
+        if text_length > 770:
+            print(f"⚠️ Warning: Text length ({text_length} chars) exceeds recommended limit of 770 characters")
+            print("Model may hallucinate or fail to complete speech generation")
+            # Still allow generation but log the warning
+        
         # Create session ID
         session_id = request.session_id or str(uuid.uuid4())
         
@@ -305,10 +508,12 @@ async def generate_speech(request: TTSRequest):
             "text": request.text,
             "voice": request.voice,
             "timestamp": datetime.now().isoformat(),
-            "status": "processing"
+            "status": "processing",
+            "text_length": text_length
         }
         
         print(f"Generating speech for session {session_id}")
+        print(f"Text length: {text_length} characters")
         print(f"Text: {request.text[:100]}...")
         print(f"Voice: {request.voice}")
         
